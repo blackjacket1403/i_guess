@@ -5,7 +5,7 @@ five-letter word games, but it is *not* one of them. You crack escalating **vaul
 bank the **loot**, and spend it to gear up… or to freeze, fog and bluff the friends
 sitting next to you on the call.
 
-▶ **Play:** https://blackjacket1403.github.io/4_of_us/
+▶ **Play:** https://blackjacket1403.github.io/i_guess/
 
 ---
 
