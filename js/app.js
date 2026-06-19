@@ -139,13 +139,25 @@
       : "<b>Five vaults</b>, getting harder (4 → 6 letters), with the gear shop between guesses (~5 min). The full game — most loot wins, badges at the end.";
   }
 
+  // random heist codename so the leaderboard isn't full of "You"
+  var NAME_ADJ = ["Sly", "Cold", "Lucky", "Masked", "Quick", "Shadow", "Velvet", "Quiet", "Golden", "Sneaky", "Bold", "Phantom", "Silent", "Smooth", "Jet", "Ace", "Slick", "Lone", "Wired", "Sharp"];
+  var NAME_NOUN = ["Fox", "Wolf", "Raven", "Cat", "Otter", "Viper", "Magpie", "Jackal", "Bandit", "Crow", "Mole", "Hawk", "Lynx", "Ghost", "Owl", "Rook", "Stoat", "Moth"];
+  function randomName() {
+    for (var i = 0; i < 30; i++) {
+      var n = NAME_ADJ[Math.floor(Math.random() * NAME_ADJ.length)] + " " + NAME_NOUN[Math.floor(Math.random() * NAME_NOUN.length)];
+      if (n.length <= 12) return n;
+    }
+    return "Crook " + (1000 + Math.floor(Math.random() * 9000));
+  }
+  TUMBLER.randomName = randomName;
+
   function renderCrewNames() {
     var wrap = $("#crew-names");
     if (!wrap) return;
     var n = S0.crew;
     var inputs = "";
     for (var i = 0; i < n; i++) {
-      var ph = n === 1 ? "Your alias" : "Crew #" + (i + 1);
+      var ph = n === 1 ? "Enter your name" : "Player " + (i + 1) + " name";
       var val = stats.names[i] || "";
       inputs += '<input class="crew-input" data-i="' + i + '" maxlength="12" placeholder="' + ph + '" value="' + esc(val) + '" style="--pc:' + COLORS[i] + '">';
     }
@@ -181,7 +193,7 @@
     for (var p = 0; p < crew; p++) {
       players.push({
         id: "p" + p,
-        name: names[p] || (crew === 1 ? "You" : "Crew " + (p + 1)),
+        name: names[p] || randomName(),
         color: COLORS[p],
         loot: 0,
         streak: 0,

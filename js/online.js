@@ -85,7 +85,7 @@
 
   function createRoom(name) {
     O = freshSession();
-    O.name = name || "Host";
+    O.name = name || (TUMBLER.randomName ? TUMBLER.randomName() : "Host");
     O.isHost = true; O.joined = true; O.color = COLORS[0];
     O.roomId = Net.genCode();
     var seed = (Math.floor(Math.random() * 0xffffffff)) >>> 0;
@@ -100,7 +100,7 @@
 
   function joinRoom(code, name) {
     O = freshSession();
-    O.name = name || "Crew";
+    O.name = name || (TUMBLER.randomName ? TUMBLER.randomName() : "Crew");
     O.roomId = code;
     Net.open(O.roomId);
     Net.onRoom(onRoom);
