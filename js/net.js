@@ -111,6 +111,31 @@
     this._write(o);
     if (this.channel) { try { this.channel.postMessage(1); } catch (e) {} }
   };
+  // global (not room-scoped) data — e.g. the world leaderboard
+  LocalNet.prototype._gkey = function (p) { return "tum.global." + p; };
+  LocalNet.prototype._emitGlobal = function (p) {
+    if (this._gcb && this._gcb[p]) { var o = {}; try { o = JSON.parse(localStorage.getItem(this._gkey(p)) || "{}"); } catch (e) {} this._gcb[p](o); }
+  };
+  LocalNet.prototype.pushGlobal = function (p, v) {
+    var k = this._gkey(p), o = {};
+    try { o = JSON.parse(localStorage.getItem(k) || "{}"); } catch (e) {}
+    o["k" + genId()] = v;
+    try { localStorage.setItem(k, JSON.stringify(o)); } catch (e) {}
+    if (typeof BroadcastChannel !== "undefined") { try { new BroadcastChannel("tum.g." + p).postMessage(1); } catch (e) {} }
+    this._emitGlobal(p);
+  };
+  LocalNet.prototype.onGlobal = function (p, cb) {
+    this._gcb = this._gcb || {}; this._gch = this._gch || {};
+    this._gcb[p] = cb;
+    var self = this;
+    if (typeof BroadcastChannel !== "undefined") { var ch = new BroadcastChannel("tum.g." + p); ch.onmessage = function () { self._emitGlobal(p); }; this._gch[p] = ch; }
+    this._emitGlobal(p);
+  };
+  LocalNet.prototype.offGlobal = function (p) {
+    if (this._gch && this._gch[p]) { try { this._gch[p].close(); } catch (e) {} delete this._gch[p]; }
+    if (this._gcb) delete this._gcb[p];
+  };
+
   LocalNet.prototype.close = function () {
     this._doDisconnectCleanup();
     window.removeEventListener("storage", this._onStorage);
@@ -141,6 +166,13 @@
   FirebaseNet.prototype.push = function (path, value) { var r = this.ref.child(path).push(); r.set(value); return r.key; };
   FirebaseNet.prototype.remove = function (path) { this.ref.child(path).remove(); };
   FirebaseNet.prototype.onDisconnectRemove = function (path) { this.ref.child(path).onDisconnect().remove(); };
+  FirebaseNet.prototype.pushGlobal = function (p, v) { var r = this.db.ref(p).push(); return r.set(v); }; // returns a promise
+  FirebaseNet.prototype.onGlobal = function (p, cb, errCb) {
+    this._g = this._g || {};
+    var ref = this.db.ref(p); this._g[p] = ref;
+    ref.on("value", function (s) { cb(s.val() || {}); }, function (e) { if (errCb) errCb(e); });
+  };
+  FirebaseNet.prototype.offGlobal = function (p) { if (this._g && this._g[p]) { this._g[p].off(); delete this._g[p]; } };
   FirebaseNet.prototype.close = function () { if (this.ref) this.ref.off(); this.cb = null; this.ref = null; };
 
   /* =========================== factory =========================== */

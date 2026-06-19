@@ -8,6 +8,7 @@
   var TUMBLER = (window.TUMBLER = window.TUMBLER || {});
   var E = TUMBLER.Engine;
   var A = TUMBLER.Audio;
+  var Net = TUMBLER.Net;
 
   /* ---------- constants ---------- */
   var COLORS = ["#34E0A1", "#E8B24C", "#5AA9FF", "#C46BFF"]; // green, brass, blue, violet
@@ -718,8 +719,10 @@
         '<div class="go-kicker">HEIST COMPLETE</div>' +
         '<h2 class="display go-title">' + headline + "</h2>" +
         '<div class="standings">' + standings + "</div>" +
+        '<button class="btn btn--ghost block go-post" id="go-post">🏆 POST ' + esc(top.name) + "'S ⛁" + top.loot + " TO THE WORLD BOARD</button>" +
         '<div class="go-actions">' +
           '<button class="btn btn--ghost" id="go-share">COPY RESULT</button>' +
+          '<button class="btn btn--ghost" id="go-board">LEADERBOARD</button>' +
           '<button class="btn btn--ghost" id="go-home">NEW CREW</button>' +
           '<button class="btn btn--primary" id="go-again">PULL ANOTHER JOB ▸</button>' +
         "</div>" +
@@ -729,6 +732,14 @@
     $("#go-again").addEventListener("click", function () { ov.className = "overlay"; ov.innerHTML = ""; startGame(); });
     $("#go-home").addEventListener("click", function () { ov.className = "overlay"; ov.innerHTML = ""; renderHome(); });
     $("#go-share").addEventListener("click", function () { shareResult(ranked, badges); });
+    $("#go-board").addEventListener("click", function () { ov.className = "overlay"; ov.innerHTML = ""; showLeaderboard(); });
+    $("#go-post").addEventListener("click", function () {
+      var b = this; b.disabled = true; b.textContent = "posting…";
+      postScore({ name: top.name, loot: top.loot, mode: S.mode, cracks: top.cracks }, function (okay) {
+        b.textContent = okay ? "✓ POSTED TO THE WORLD BOARD" : "✗ couldn't post — tap to retry";
+        if (!okay) b.disabled = false;
+      });
+    });
   }
 
   function computeBadges(ranked) {
@@ -832,12 +843,14 @@
    * ==================================================================== */
   function bindTopbar() {
     $("#btn-how").addEventListener("click", openHow);
+    var bb = $("#btn-board");
+    if (bb) bb.addEventListener("click", function () { if (TUMBLER.Online && TUMBLER.Online.active()) return; showLeaderboard(); });
     var sb = $("#btn-sound");
     function paint() { sb.innerHTML = "SOUND " + (settings.sound ? "◉" : "◎"); sb.classList.toggle("on", settings.sound); }
     paint();
     sb.addEventListener("click", function () {
       settings.sound = !settings.sound; saveSettings();
-      if (A) { A.setEnabled(settings.sound); if (settings.sound) A.tick(); }
+      if (A) { A.setEnabled(settings.sound); if (settings.sound) { A.tick(); A.startAmbient(); } }
       paint();
     });
     $(".brand").addEventListener("click", function () { if (S) { if (confirm("Abandon the heist and return home?")) renderHome(); } });
@@ -867,11 +880,74 @@
           "<p><b>Heist Run</b> — five escalating vaults, the full game. &nbsp;<b>Quick Crack</b> — one fast 5-letter vault.</p>" +
           "<p><b>Pass-the-laptop</b> — share one screen, take turns. &nbsp;<b>Play Online</b> — each player joins a room link and races on their own device.</p>" +
         "</div>" +
-        '<button class="btn btn--primary block" id="how-close">GOT IT</button>' +
+        '<div class="how-foot">' +
+          (("speechSynthesis" in window) ? '<button class="btn btn--ghost" id="how-listen">🔊 Listen to the rules</button>' : "") +
+          '<button class="btn btn--primary" id="how-close">GOT IT</button>' +
+        "</div>" +
       "</div>";
     ov.className = "overlay show";
-    $("#how-close").addEventListener("click", function () { ov.className = "overlay"; ov.innerHTML = ""; });
+    var listenBtn = $("#how-listen");
+    if (listenBtn) listenBtn.addEventListener("click", function () { speakRules(listenBtn); });
+    $("#how-close").addEventListener("click", function () {
+      try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) {}
+      ov.className = "overlay"; ov.innerHTML = "";
+    });
   }
+
+  var RULES_SPEECH = "Here's how to play, i guess. If you've played Wordle, you already know the heart of it. You guess a hidden word, and after each guess the tiles show how close you are. Green means the right letter in the right spot. Gold means the letter is in the word, but the wrong spot. Grey means it's not in the word. i guess turns that into a heist. First, pick your crew, one to four players, and a job. A heist run is five vaults that get harder. Quick crack is a single fast vault. Each vault hides a secret word. Type any real word, then use the colours to crack it before your guesses run out. Cracking a vault pays loot. The faster you crack it, with a calm alarm, the more you earn. But every wrong guess trips the alarm, and if it fills up, the vault locks and you get nothing. Spend your loot in the gear shop to help yourself: reveal a letter, buy an extra guess, or cool the alarm. Or spend it to sabotage a rival: freeze a key, fog their clue, or plant a fake hint. After five vaults, whoever has the most loot wins. Now go crack some vaults.";
+  function speakRules(btn) {
+    if (!("speechSynthesis" in window)) return;
+    var synth = window.speechSynthesis;
+    if (synth.speaking || synth.pending) { synth.cancel(); btn.textContent = "🔊 Listen to the rules"; return; }
+    var u = new SpeechSynthesisUtterance(RULES_SPEECH);
+    u.rate = 1.02; u.pitch = 1;
+    u.onend = function () { btn.textContent = "🔊 Listen to the rules"; };
+    u.onerror = function () { btn.textContent = "🔊 Listen to the rules"; };
+    btn.textContent = "⏹ Stop";
+    synth.speak(u);
+  }
+
+  /* ====================================================================
+   *  WORLD LEADERBOARD (global, via Firebase; local-only without it)
+   * ==================================================================== */
+  function showLeaderboard() {
+    appEl().innerHTML =
+      '<section class="screen board"><div class="panel board-panel">' +
+        '<h2 class="display">WORLD LEADERBOARD</h2>' +
+        '<p class="muted">Biggest hauls from everyone who has posted a score.</p>' +
+        (Net && Net.mode === "local" ? '<div class="demo-banner">⚠ Showing this browser only. Add your Firebase config for a shared world board.</div>' : "") +
+        '<div id="board-list" class="board-list"><div class="board-empty">loading…</div></div>' +
+        '<button class="btn btn--ghost block back" id="board-back">← BACK</button>' +
+      "</div></section>";
+    $("#board-back").addEventListener("click", function () { try { Net.offGlobal("leaderboard"); } catch (e) {} renderHome(); });
+    if (!Net) return;
+    Net.onGlobal("leaderboard", renderBoardList, function () {
+      var el = $("#board-list");
+      if (el) el.innerHTML = '<div class="board-empty">World board isn\'t switched on yet. Add the <code>leaderboard</code> rule in Firebase (see the README), then post a score.</div>';
+    });
+  }
+  function renderBoardList(data) {
+    var el = $("#board-list"); if (!el) return;
+    var arr = Object.keys(data || {}).map(function (k) { return data[k]; }).filter(function (e) { return e && typeof e.loot === "number"; });
+    arr.sort(function (a, b) { return b.loot - a.loot; });
+    if (!arr.length) { el.innerHTML = '<div class="board-empty">No scores yet — be the first to post one!</div>'; return; }
+    el.innerHTML = arr.slice(0, 30).map(function (e, i) {
+      var rank = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : (i + 1);
+      return '<div class="board-row' + (i < 3 ? " top" : "") + '"><span class="br-rank">' + rank + '</span><span class="br-name">' + esc(e.name || "Anon") + '</span><span class="br-mode">' + (e.mode === "quick" ? "Quick" : "Run") + '</span><span class="br-loot">⛁ ' + e.loot + "</span></div>";
+    }).join("");
+  }
+  function postScore(entry, onDone) {
+    if (!Net) { if (onDone) onDone(false); return; }
+    var rec = { name: String(entry.name || "Anon").slice(0, 12) || "Anon", loot: entry.loot || 0, mode: entry.mode || "run", cracks: entry.cracks || 0, ts: now() };
+    var ok = function () { if (onDone) onDone(true); };
+    var fail = function () { toast("couldn't reach the world board (check Firebase rules)", "bad"); if (onDone) onDone(false); };
+    try {
+      var p = Net.pushGlobal("leaderboard", rec);
+      if (p && typeof p.then === "function") p.then(ok, fail); else ok();
+    } catch (e) { fail(); }
+  }
+  TUMBLER.showLeaderboard = showLeaderboard;
+  TUMBLER.postScore = postScore;
 
   document.addEventListener("keydown", function (ev) {
     if (!S) return;
@@ -891,7 +967,23 @@
       appEl().innerHTML = '<section class="screen"><div class="panel"><h2>Word vault failed to load</h2><p class="muted">Make sure <code>js/words.js</code> is present.</p></div></section>';
       return;
     }
-    if (A) A.setEnabled(settings.sound);
+    if (A) {
+      A.setEnabled(settings.sound);
+      // ambient needs a user gesture to start (autoplay policy) — kick it on the first one
+      var kickAmbient = function () {
+        if (settings.sound && A) A.startAmbient();
+        document.removeEventListener("pointerdown", kickAmbient);
+        document.removeEventListener("keydown", kickAmbient);
+      };
+      document.addEventListener("pointerdown", kickAmbient);
+      document.addEventListener("keydown", kickAmbient);
+      // pause the drone when the tab is hidden (don't bleed into a Meet call when away)
+      document.addEventListener("visibilitychange", function () {
+        if (!A) return;
+        if (document.hidden) A.stopAmbient();
+        else if (settings.sound) A.startAmbient();
+      });
+    }
     // honour OS reduced-motion as the default unless user toggled
     if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) settings.motion = false;
     bindTopbar();

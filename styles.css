@@ -369,7 +369,10 @@ code { font-family: var(--mono); color: var(--brass); }
 .flow li { counter-increment: step; position: relative; padding-left: 40px; margin-bottom: 11px; line-height: 1.5; color: var(--muted); font-size: 13.5px; }
 .flow li::before { content: counter(step); position: absolute; left: 0; top: -1px; width: 27px; height: 27px; display: grid; place-items: center; border-radius: 50%; background: var(--steel-800); border: 1px solid var(--brass-deep); color: var(--brass); font-family: var(--mono); font-weight: 800; font-size: 12px; }
 .flow b { color: var(--bone); }
+.how-foot { display: flex; gap: 8px; margin-top: 4px; }
+.how-foot .btn { flex: 1; width: auto; }
 @media (max-width: 520px) { .how-grid { grid-template-columns: 1fr; } }
+@media (max-width: 440px) { .how-foot { flex-direction: column; } }
 
 /* ---------- ONLINE: home CTA, menu, lobby ---------- */
 .online-cta { margin-top: 18px; padding-top: 16px; border-top: 1px dashed var(--line); display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
@@ -407,6 +410,26 @@ code { font-family: var(--mono); color: var(--brass); }
 
 .solved-chip { color: var(--hit) !important; border-color: var(--hit-deep) !important; background: rgba(52,224,161,0.1) !important; }
 .busted-chip { color: var(--alarm) !important; border-color: #6b2020 !important; background: rgba(255,77,77,0.1) !important; }
+
+/* ---------- leaderboard ---------- */
+.board { display: grid; place-items: center; min-height: 64vh; }
+.board-panel { width: min(540px, 96vw); text-align: center; }
+.board-list { display: flex; flex-direction: column; gap: 6px; margin: 16px 0; max-height: 58vh; overflow: auto; text-align: left; }
+.board-row { display: grid; grid-template-columns: 34px 1fr auto auto; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 9px; background: var(--steel-800); border: 1px solid var(--line); }
+.board-row.top { border-color: var(--brass-deep); }
+.br-rank { font-family: var(--mono); font-weight: 800; color: var(--dim); text-align: center; }
+.board-row.top .br-rank { font-size: 18px; }
+.br-name { font-family: var(--display); font-weight: 600; letter-spacing: 0.03em; font-size: 16px; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.br-mode { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; color: var(--dim); text-transform: uppercase; }
+.br-loot { font-family: var(--mono); font-weight: 800; color: var(--brass); }
+.board-empty { color: var(--muted); font-size: 14px; line-height: 1.5; padding: 24px 8px; text-align: center; }
+.go-post { margin-top: 6px; }
+.group-board { margin: 14px 0; text-align: left; }
+.group-title { font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em; color: var(--dim); margin-bottom: 8px; text-transform: uppercase; }
+.group-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 8px 12px; border-radius: 8px; background: var(--steel-800); border: 1px solid var(--line); border-left: 3px solid var(--pc); margin-bottom: 6px; }
+.group-row .gr-wins { font-family: var(--mono); font-size: 11px; color: var(--hit); letter-spacing: 0.06em; }
+.group-row .gr-loot { font-family: var(--mono); font-weight: 800; color: var(--brass); }
+.group-row .gr-name { font-family: var(--display); font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; }
 
 /* ---------- TOAST ---------- */
 .toast {

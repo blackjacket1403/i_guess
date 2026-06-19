@@ -80,7 +80,7 @@
   function freshSession() {
     return { active: true, meId: Net.genId(), roomId: null, name: "", color: COLORS[0], isHost: false,
       joined: false, room: {}, board: null, current: "", vaultIdx: -1, streak: 0,
-      applied: {}, overShown: false, advancing: false };
+      applied: {}, overShown: false, advancing: false, tallied: false };
   }
 
   function createRoom(name) {
@@ -184,6 +184,7 @@
           demoBanner() +
           '<button class="btn btn--ghost block" id="lb-copy">📋 COPY INVITE LINK</button>' +
           '<div class="lobby-seats">' + seats + "</div>" +
+          groupBoardHTML() +
           (O.isHost
             ? '<button class="btn btn--primary block" id="lb-start"' + (canStart ? "" : " disabled") + '>' + (canStart ? "START THE HEIST ▸" : "WAITING FOR CREW (2+)…") + "</button>"
             : '<div class="lobby-wait">Waiting for the host to start…</div>') +
@@ -227,6 +228,7 @@
       effects: { frozenKey: null, fog: 0, decoy: false },
     };
     O.current = ""; O.vaultIdx = idx; O.advancing = false;
+    if (idx === 0) O.tallied = false; // a fresh run can be tallied again at its end
     Net.update("players/" + O.meId + "/vault", { idx: idx, alarm: 0, guessesUsed: 0, solved: false, busted: false });
     startTimer();
   }
@@ -524,8 +526,41 @@
   /* ====================================================================
    *  GAME OVER
    * ==================================================================== */
+  // cumulative room standings across games (host writes once per game)
+  function tallyGame() {
+    if (!O.isHost || O.tallied) return;
+    var players = sortedPlayers();
+    if (!players.length) return;
+    O.tallied = true;
+    var winnerId = players.slice().sort(function (a, b) { return (b.loot || 0) - (a.loot || 0); })[0].id;
+    var tally = O.room.tally || {};
+    players.forEach(function (p) {
+      var t = tally[p.id] || { wins: 0, loot: 0, games: 0 };
+      Net.update("tally/" + p.id, {
+        name: p.name,
+        wins: (t.wins || 0) + (p.id === winnerId ? 1 : 0),
+        loot: (t.loot || 0) + (p.loot || 0),
+        games: (t.games || 0) + 1,
+      });
+    });
+  }
+  function groupBoardHTML() {
+    var tally = O.room.tally;
+    if (!tally) return "";
+    var arr = Object.keys(tally).map(function (id) { return Object.assign({ id: id }, tally[id]); });
+    if (!arr.length) return "";
+    arr.sort(function (a, b) { return (b.wins || 0) - (a.wins || 0) || (b.loot || 0) - (a.loot || 0); });
+    var players = O.room.players || {};
+    var rows = arr.map(function (t) {
+      var color = (players[t.id] && players[t.id].color) || "#8a96a2";
+      return '<div class="group-row" style="--pc:' + color + '"><span class="gr-name">' + esc(t.name || "?") + '</span><span class="gr-wins">' + (t.wins || 0) + " 🏆</span><span class=\"gr-loot\">⛁ " + (t.loot || 0) + "</span></div>";
+    }).join("");
+    return '<div class="group-board"><div class="group-title">Group standings · ' + (arr[0].games || 0) + " game" + ((arr[0].games || 0) === 1 ? "" : "s") + "</div>" + rows + "</div>";
+  }
+
   function renderOver() {
     stopTimer();
+    tallyGame();
     var ranked = sortedPlayers().sort(function (a, b) { return (b.loot || 0) - (a.loot || 0); });
     var top = ranked[0] || {};
     var badges = computeBadges(ranked, top);
@@ -537,13 +572,25 @@
       '<div class="panel gameover-panel"><div class="go-kicker">HEIST COMPLETE</div>' +
       '<h2 class="display go-title">' + esc(top.name || "") + " TAKES THE SCORE</h2>" +
       '<div class="standings">' + rows + "</div>" +
+      groupBoardHTML() +
+      '<button class="btn btn--ghost block" id="go-post">🏆 POST YOUR ⛁' + (me().loot || 0) + " TO THE WORLD BOARD</button>" +
       '<div class="go-actions"><button class="btn btn--ghost" id="go-share">COPY RESULT</button>' +
+      '<button class="btn btn--ghost" id="go-world">WORLD BOARD</button>' +
       (O.isHost ? '<button class="btn btn--primary" id="go-again">PLAY AGAIN ▸</button>' : '<button class="btn btn--ghost" id="go-lobby">BACK TO LOBBY</button>') +
       '<button class="btn btn--ghost" id="go-leave">LEAVE</button></div></div>';
     ov().className = "overlay show";
     if (!O.overShown && A) { O.overShown = true; A.crack(); setTimeout(function () { A.loot(); }, 300); }
     $("#go-share").addEventListener("click", function () { shareResult(ranked, badges); });
     $("#go-leave").addEventListener("click", leave);
+    $("#go-post").addEventListener("click", function () {
+      var b = this; b.disabled = true; b.textContent = "posting…";
+      if (TUMBLER.postScore) TUMBLER.postScore({ name: O.name, loot: me().loot || 0, mode: "run", cracks: me().cracks || 0 }, function (ok) {
+        b.textContent = ok ? "✓ POSTED" : "✗ couldn't post — tap to retry"; if (!ok) b.disabled = false;
+      });
+      else { b.textContent = "✗ unavailable"; }
+    });
+    var gw = $("#go-world");
+    if (gw) gw.addEventListener("click", function () { teardown(); if (TUMBLER.showLeaderboard) TUMBLER.showLeaderboard(); });
     if (O.isHost) $("#go-again").addEventListener("click", playAgain);
     else { var gl = $("#go-lobby"); if (gl) gl.addEventListener("click", function () { ov().className = "overlay"; ov().innerHTML = ""; }); }
   }

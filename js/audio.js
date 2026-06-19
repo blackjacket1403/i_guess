@@ -56,12 +56,52 @@
     src.start();
   }
 
+  /* ---- ambient drone: a subtle, on-theme "vault room" pad. Tied to the
+   *      sound toggle; fades in/out so there are no clicks. No audio files. ---- */
+  var ambient = null;
+  function startAmbient() {
+    if (!enabled || ambient) return;
+    var c = ensure();
+    if (!c) return;
+    var t = c.currentTime;
+    var master = c.createGain();
+    master.gain.setValueAtTime(0.0001, t);
+    master.gain.exponentialRampToValueAtTime(0.05, t + 3); // slow fade-in
+    var lp = c.createBiquadFilter();
+    lp.type = "lowpass"; lp.frequency.value = 300; lp.Q.value = 0.6;
+    lp.connect(master); master.connect(c.destination);
+    var oscs = [];
+    [[55, "triangle", 0.32], [82.5, "triangle", 0.3], [110, "sine", 0.14]].forEach(function (d) {
+      var o = c.createOscillator(); o.type = d[1]; o.frequency.value = d[0];
+      var g = c.createGain(); g.gain.value = d[2];
+      o.connect(g).connect(lp); o.start(); oscs.push(o);
+    });
+    var lfo = c.createOscillator(); lfo.type = "sine"; lfo.frequency.value = 0.05;
+    var lfoG = c.createGain(); lfoG.gain.value = 110;
+    lfo.connect(lfoG).connect(lp.frequency); lfo.start(); // slow movement on the filter
+    ambient = { master: master, oscs: oscs, lfo: lfo };
+  }
+  function stopAmbient() {
+    if (!ambient || !ctx) return;
+    var a = ambient; ambient = null;
+    var t = ctx.currentTime;
+    try {
+      a.master.gain.cancelScheduledValues(t);
+      a.master.gain.setValueAtTime(Math.max(0.0001, a.master.gain.value), t);
+      a.master.gain.exponentialRampToValueAtTime(0.0001, t + 0.8);
+    } catch (e) {}
+    setTimeout(function () { try { a.oscs.forEach(function (o) { o.stop(); }); a.lfo.stop(); } catch (e) {} }, 900);
+  }
+
   var Audio = {
     setEnabled: function (v) {
       enabled = !!v;
       // don't create the AudioContext here — wait for the first real sound,
       // which always follows a user gesture (avoids the autoplay warning).
+      if (!enabled) stopAmbient();
     },
+    startAmbient: startAmbient,
+    stopAmbient: stopAmbient,
     isEnabled: function () {
       return enabled;
     },

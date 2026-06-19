@@ -63,8 +63,7 @@ controlled by the rules, not by hiding the config.
 
 ### Firebase rules
 
-Casual, open rooms (anyone with the link can read/write a room; the rest of the
-database is locked):
+Open rooms + a public world leaderboard (the rest of the database stays locked):
 
 ```json
 {
@@ -73,10 +72,14 @@ database is locked):
     ".write": false,
     "rooms": {
       "$room": { ".read": true, ".write": true }
-    }
+    },
+    "leaderboard": { ".read": true, ".write": true }
   }
 }
 ```
+
+> Set up Firebase before the leaderboard existed? Re-publish these rules (add the
+> `leaderboard` line) or the world leaderboard will stay empty.
 
 ## Tech
 
