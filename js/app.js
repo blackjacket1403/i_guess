@@ -51,8 +51,8 @@
 
   /* ---------- persistence ---------- */
   function loadSettings() {
-    try { return Object.assign({ sound: true, motion: true }, JSON.parse(localStorage.getItem("tumbler.settings") || "{}")); }
-    catch (e) { return { sound: true, motion: true }; }
+    try { return Object.assign({ sound: true, motion: true, readRules: false }, JSON.parse(localStorage.getItem("tumbler.settings") || "{}")); }
+    catch (e) { return { sound: true, motion: true, readRules: false }; }
   }
   function saveSettings() { try { localStorage.setItem("tumbler.settings", JSON.stringify(settings)); } catch (e) {} }
   function loadStats() {
@@ -100,6 +100,7 @@
               '<div class="mode-desc">' + modeDesc(S0.mode) + "</div>" +
               '<div class="crew-names" id="crew-names"></div>' +
               '<button class="btn btn--primary cta" id="start">' + (S0.crew === 1 ? "PLAY SOLO ▸" : "ASSEMBLE CREW ▸") + "</button>" +
+              (("speechSynthesis" in window) ? '<label class="readrules-opt"><input type="checkbox" id="read-rules"' + (settings.readRules ? " checked" : "") + '><span>🔊 Read the rules aloud when I start</span></label>' : "") +
             "</div>" +
             '<div class="online-cta"><span class="online-cta-label">on a call with friends?</span><button class="btn btn--ghost" id="play-online">PLAY ONLINE — LIVE ROOMS ▸</button></div>' +
           "</div>" +
@@ -112,7 +113,12 @@
       "</section>";
     appEl().innerHTML = html;
     renderCrewNames();
-    $("#start").addEventListener("click", startGame);
+    $("#start").addEventListener("click", function () {
+      if (settings.readRules && ("speechSynthesis" in window)) openHow({ autoRead: true, onStart: startGame });
+      else startGame();
+    });
+    var rr = $("#read-rules");
+    if (rr) rr.addEventListener("change", function () { settings.readRules = rr.checked; saveSettings(); });
     var po = $("#play-online");
     if (po) po.addEventListener("click", function () { if (TUMBLER.Online) TUMBLER.Online.menu(); });
   }
@@ -856,7 +862,9 @@
     $(".brand").addEventListener("click", function () { if (S) { if (confirm("Abandon the heist and return home?")) renderHome(); } });
   }
 
-  function openHow() {
+  function openHow(opts) {
+    opts = opts && typeof opts === "object" && !opts.type ? opts : {}; // ignore DOM events passed as arg
+    var startMode = typeof opts.onStart === "function";
     var ov = overlayEl();
     ov.innerHTML =
       '<div class="panel how-panel">' +
@@ -882,7 +890,7 @@
         "</div>" +
         '<div class="how-foot">' +
           (("speechSynthesis" in window) ? '<button class="btn btn--ghost" id="how-listen">🔊 Listen to the rules</button>' : "") +
-          '<button class="btn btn--primary" id="how-close">GOT IT</button>' +
+          '<button class="btn btn--primary" id="how-close">' + (startMode ? "START PLAYING ▸" : "GOT IT") + "</button>" +
         "</div>" +
       "</div>";
     ov.className = "overlay show";
@@ -891,7 +899,9 @@
     $("#how-close").addEventListener("click", function () {
       try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) {}
       ov.className = "overlay"; ov.innerHTML = "";
+      if (startMode) opts.onStart();
     });
+    if (opts.autoRead && listenBtn) speakRules(listenBtn);
   }
 
   var RULES_SPEECH = "Here's how to play, i guess. If you've played Wordle, you already know the heart of it. You guess a hidden word, and after each guess the tiles show how close you are. Green means the right letter in the right spot. Gold means the letter is in the word, but the wrong spot. Grey means it's not in the word. i guess turns that into a heist. First, pick your crew, one to four players, and a job. A heist run is five vaults that get harder. Quick crack is a single fast vault. Each vault hides a secret word. Type any real word, then use the colours to crack it before your guesses run out. Cracking a vault pays loot. The faster you crack it, with a calm alarm, the more you earn. But every wrong guess trips the alarm, and if it fills up, the vault locks and you get nothing. Spend your loot in the gear shop to help yourself: reveal a letter, buy an extra guess, or cool the alarm. Or spend it to sabotage a rival: freeze a key, fog their clue, or plant a fake hint. After five vaults, whoever has the most loot wins. Now go crack some vaults.";

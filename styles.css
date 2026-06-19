@@ -115,6 +115,9 @@ code { font-family: var(--mono); color: var(--brass); }
 .seg-opt.active { color: var(--vault-black); background: var(--hit); box-shadow: 0 0 18px rgba(52,224,161,0.35); }
 .mode-desc { font-size: 13px; line-height: 1.5; color: var(--muted); max-width: 52ch; margin: -4px 0 2px; }
 .mode-desc b { color: var(--bone); }
+.readrules-opt { display: inline-flex; align-items: center; gap: 9px; margin-top: 12px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.03em; color: var(--muted); cursor: pointer; }
+.readrules-opt input { width: 16px; height: 16px; accent-color: var(--hit); cursor: pointer; flex: 0 0 auto; }
+.readrules-opt:hover { color: var(--bone); }
 
 .crew-names { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 2px; }
 .crew-input {
