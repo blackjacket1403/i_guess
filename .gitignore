@@ -1,0 +1,5 @@
+# local tooling / editor cruft — nothing here is needed to run TUMBLER
+.DS_Store
+node_modules/
+.playwright-mcp/
+*.log
